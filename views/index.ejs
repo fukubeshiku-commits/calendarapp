@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <title>部活日程調整</title>
+        <link rel="stylesheet" href="style.css">
+
+    </head>
+    <body>
+        <div id="app-container">
+        <div id="calendar-header">
+            <button id="prev-month">＜先月</button>
+            <div id="this-month"></div>
+            <button id="next-month">来月＞</button>
+        </div>
+
+        <button id="add-bulk-plan">予定を一括追加</button>
+        
+        <div id="calendar-main">
+            <ul class="weekdays">
+                <li>日</li><li>月</li><li>火</li><li>水</li><li>木</li><li>金</li><li>土</li>
+            </ul>
+            <ul id="days-grid" class="days">
+                </ul>
+        </div>
+    
+        </div>
+
+        <div id="addplanscreen" class="hidden">
+            <div id="calendar-header-bulk">
+            <button id="prev-month-bulk">＜先月</button>
+            <div id="this-month-bulk"></div>
+            <button id="next-month-bulk">来月＞</button>
+            </div>
+
+            <div id="mess-button">
+            <div id="add-bulk-plan-mess">日付をタップで選択</div>
+            <div id="button-group">
+            <button id="nextbutton">次へ</button>
+            <button id="backbutton">戻る</button>
+            </div>
+            </div>
+
+            <div id="calendar-main-bulk">
+            <ul class="weekdays">
+                <li>日</li><li>月</li><li>火</li><li>水</li><li>木</li><li>金</li><li>土</li>
+            </ul>
+            <ul id="days-grid-bulk" class="days">
+                </ul>
+            </div>
+
+            <div id="practiceplace">
+                <span id="location-selector">↓場所を選択</span>
+            <label><input type="radio" name="place" value="上祖師谷中学校格技室">上祖師谷中学校格技室</label>
+            <label><input type="radio" name="place" value="砧中学校格技室">砧中学校格技室</label>
+            <label><input type="radio" name="place" id="custom-location-check"><input type="text" id="custom-location-place" placeholder="その他（入力してください）"></label>
+            </div>
+
+            <div id="practicetime">
+                <span id="time-selector">↓時間を選択</span>
+           <label><input type="radio" name="time" value="終日">終日</label>
+                 <label><input type="time" id="start-time" value="18:30">~<input type="time" id="end-time" value="21:00"></label>
+            </div>
+           
+
+        
+    
+        
+        </div>
+
+        <script defer src="client.js"></script>
+        
+    </body>
+</html>
