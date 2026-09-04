@@ -12,6 +12,7 @@ let prevmonth;
 let thisMonthBulk;
 let nextmonthbulk;
 let prevmonthbulk;
+let exportIcsButton;
 
 const current = {
     year: new Date().getFullYear(),
@@ -45,6 +46,73 @@ async function persistSaved() {
         console.error('Failed to persist schedule', e);
         throw e;
     }
+}
+
+// Build iCalendar (.ics) content from current `saved` entries
+function buildIcs() {
+    const lines = [];
+    lines.push('BEGIN:VCALENDAR');
+    lines.push('VERSION:2.0');
+    lines.push('PRODID:-//calendarapp//EN');
+
+    const pad = (n) => n.toString().padStart(2, '0');
+    const formatDateTime = (y, m, d, time) => {
+        // time: "HH:MM" or empty
+        if (!time || time === '終日') return `${y}${pad(m)}${pad(d)}`;
+        const [hh, mm] = time.split(':');
+        return `${y}${pad(m)}${pad(d)}T${pad(hh)}${pad(mm)}00`;
+    };
+
+    let uidCounter = Date.now();
+
+    if (Array.isArray(saved)) {
+        saved.forEach((plan, pIdx) => {
+            const dates = Array.isArray(plan.date) ? plan.date : [];
+            dates.forEach((dateKey, dIdx) => {
+                const parts = String(dateKey).split('-').map(s => parseInt(s, 10));
+                if (parts.length < 3) return;
+                const year = parts[0];
+                const monthIndex = parts[1];
+                const day = parts[2];
+                const month = monthIndex + 1; // stored monthIndex is zero-based
+
+                const isAllDay = !plan.onestartTime && plan.oneendTime === '終日';
+                const dtStart = formatDateTime(year, month, day, isAllDay ? null : plan.onestartTime);
+                const dtEnd = formatDateTime(year, month, day, isAllDay ? null : plan.oneendTime);
+
+                lines.push('BEGIN:VEVENT');
+                const uid = `${uidCounter++}-${pIdx}-${dIdx}@calendarapp`;
+                lines.push(`UID:${uid}`);
+                if (isAllDay) {
+                    lines.push(`DTSTART;VALUE=DATE:${dtStart}`);
+                    lines.push(`DTEND;VALUE=DATE:${dtStart}`);
+                } else {
+                    lines.push(`DTSTART:${dtStart}`);
+                    if (dtEnd) lines.push(`DTEND:${dtEnd}`);
+                }
+                const summary = (plan.place || '予定').toString().replace(/\r?\n/g, ' ');
+                lines.push(`SUMMARY:${summary}`);
+                if (plan.place) lines.push(`LOCATION:${plan.place}`);
+                lines.push('END:VEVENT');
+            });
+        });
+    }
+
+    lines.push('END:VCALENDAR');
+    return lines.join('\r\n');
+}
+
+function downloadIcs(filename = 'calendar.ics') {
+    const ics = buildIcs();
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
 }
 
    
@@ -238,6 +306,7 @@ async function initCalendar() {
     thisMonthBulk = document.querySelector("#this-month-bulk");
     nextmonthbulk = document.querySelector("#next-month-bulk");
     prevmonthbulk = document.querySelector("#prev-month-bulk");
+    exportIcsButton = document.querySelector('#export-ics');
 
     await loadSaved();
     // render grids
@@ -331,6 +400,15 @@ async function initCalendar() {
         if (addplanscreen) addplanscreen.classList.add("hidden");
         if (appcontainer) appcontainer.classList.remove("hidden");
         if (daysGrid) rendercalendar(daysGrid, current.year, current.monthIndex);
+    });
+
+    if (exportIcsButton) exportIcsButton.addEventListener('click', () => {
+        try {
+            downloadIcs();
+        } catch (e) {
+            console.error('Failed to generate ICS', e);
+            window.alert('ICSの生成に失敗しました');
+        }
     });
 
 }
