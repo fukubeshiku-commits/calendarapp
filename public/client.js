@@ -308,6 +308,58 @@ async function initCalendar() {
     prevmonthbulk = document.querySelector("#prev-month-bulk");
     exportIcsButton = document.querySelector('#export-ics');
 
+    // Fallback for browsers that don't support input[type=time] (some mobile browsers)
+    const testTimeInput = document.createElement('input');
+    testTimeInput.setAttribute('type', 'time');
+    const timeSupported = testTimeInput.type === 'time';
+    if (!timeSupported) {
+        const replaceTimeWithSelect = (id, defaultValue) => {
+            const orig = document.getElementById(id);
+            if (!orig) return;
+            const container = document.createElement('span');
+            container.style.display = 'inline-flex';
+            container.style.gap = '4px';
+
+            const [defH, defM] = (defaultValue || '18:30').split(':');
+            const hour = document.createElement('select');
+            hour.id = id; // keep same id so other code can query
+            for (let h = 0; h < 24; h++) {
+                const opt = document.createElement('option');
+                opt.value = String(h).padStart(2, '0');
+                opt.textContent = String(h).padStart(2, '0');
+                if (String(h).padStart(2, '0') === defH) opt.selected = true;
+                hour.appendChild(opt);
+            }
+
+            const minute = document.createElement('select');
+            minute.dataset.minutePart = 'true';
+            minute.id = id + '-minute';
+            ['00','15','30','45'].forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                if (m === defM) opt.selected = true;
+                minute.appendChild(opt);
+            });
+
+            // expose value property to mimic input[type=time]
+            // keep reference to minute select for disabling
+            hour.dataset.pairId = minute.id;
+            Object.defineProperty(hour, 'value', {
+                get() { return `${hour.querySelector('option:checked').value}:${minute.querySelector('option:checked').value}`; }
+            });
+
+            container.appendChild(hour);
+            container.appendChild(document.createTextNode(':'));
+            container.appendChild(minute);
+            orig.replaceWith(container);
+        };
+
+        // replace both start and end if present
+        replaceTimeWithSelect('start-time', '18:30');
+        replaceTimeWithSelect('end-time', '21:00');
+    }
+
     await loadSaved();
     // render grids
     if (daysGrid) rendercalendar(daysGrid, current.year, current.monthIndex);
@@ -345,8 +397,21 @@ async function initCalendar() {
         if (allDayRadio && startTimeEl && endTimeEl) {
             const syncTimeInputs = () => {
                 const checked = allDayRadio.checked;
-                startTimeEl.disabled = checked;
-                endTimeEl.disabled = checked;
+                const disablePair = (el, disabled) => {
+                    try {
+                        el.disabled = disabled;
+                    } catch (e) {}
+                    const pairId = el.dataset && el.dataset.pairId;
+                    if (pairId) {
+                        const pair = document.getElementById(pairId);
+                        if (pair) pair.disabled = disabled;
+                    } else {
+                        const maybe = el.nextElementSibling;
+                        if (maybe && maybe.dataset && maybe.dataset.minutePart) maybe.disabled = disabled;
+                    }
+                };
+                if (startTimeEl) disablePair(startTimeEl, checked);
+                if (endTimeEl) disablePair(endTimeEl, checked);
                 if (checked) {
                     startTime = "";
                     endTime = "終日";
