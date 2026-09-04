@@ -77,7 +77,16 @@ function buildIcs() {
         return toUtcStamp(local);
     };
 
-    const uidBase = Date.now();
+    const hashString = (str) => {
+        let h = 5381;
+        for (let i = 0; i < str.length; i++) {
+            h = ((h << 5) + h) + str.charCodeAt(i);
+            h = h & 0xffffffff;
+        }
+        return (h >>> 0).toString(16);
+    };
+
+    const seenUids = new Set();
 
     if (Array.isArray(saved)) {
         saved.forEach((plan, pIdx) => {
@@ -94,8 +103,19 @@ function buildIcs() {
                 const dtStartUtc = formatLocalToUtc(year, month, day, isAllDay ? null : plan.onestartTime);
                 const dtEndUtc = formatLocalToUtc(year, month, day, isAllDay ? null : plan.oneendTime);
 
+                const uidKey = [
+                    String(year),
+                    String(month),
+                    String(day),
+                    String(plan.place || ''),
+                    String(plan.onestartTime || ''),
+                    String(plan.oneendTime || '')
+                ].join('|');
+                const uid = `${hashString(uidKey)}@calendarapp`;
+                if (seenUids.has(uid)) return;
+                seenUids.add(uid);
+
                 lines.push('BEGIN:VEVENT');
-                const uid = `${uidBase}-${pIdx}-${dIdx}@calendarapp`;
                 lines.push(`UID:${uid}`);
                 // DTSTAMP: now in UTC
                 lines.push(`DTSTAMP:${toUtcStamp(new Date())}`);
