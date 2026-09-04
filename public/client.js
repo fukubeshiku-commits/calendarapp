@@ -56,14 +56,28 @@ function buildIcs() {
     lines.push('PRODID:-//calendarapp//EN');
 
     const pad = (n) => n.toString().padStart(2, '0');
-    const formatDateTime = (y, m, d, time) => {
-        // time: "HH:MM" or empty
-        if (!time || time === '終日') return `${y}${pad(m)}${pad(d)}`;
-        const [hh, mm] = time.split(':');
-        return `${y}${pad(m)}${pad(d)}T${pad(hh)}${pad(mm)}00`;
+
+    const toUtcStamp = (date) => {
+        // format as YYYYMMDDTHHMMSSZ using UTC
+        return date.getUTCFullYear().toString()
+            + pad(date.getUTCMonth() + 1)
+            + pad(date.getUTCDate())
+            + 'T'
+            + pad(date.getUTCHours())
+            + pad(date.getUTCMinutes())
+            + pad(date.getUTCSeconds())
+            + 'Z';
     };
 
-    let uidCounter = Date.now();
+    const formatLocalToUtc = (y, m, d, time) => {
+        if (!time || time === '終日') return null;
+        const [hh, mm] = time.split(':').map(s => parseInt(s, 10));
+        // month in Date constructor is 0-based
+        const local = new Date(y, m - 1, d, hh, mm, 0);
+        return toUtcStamp(local);
+    };
+
+    const uidBase = Date.now();
 
     if (Array.isArray(saved)) {
         saved.forEach((plan, pIdx) => {
@@ -77,18 +91,23 @@ function buildIcs() {
                 const month = monthIndex + 1; // stored monthIndex is zero-based
 
                 const isAllDay = !plan.onestartTime && plan.oneendTime === '終日';
-                const dtStart = formatDateTime(year, month, day, isAllDay ? null : plan.onestartTime);
-                const dtEnd = formatDateTime(year, month, day, isAllDay ? null : plan.oneendTime);
+                const dtStartUtc = formatLocalToUtc(year, month, day, isAllDay ? null : plan.onestartTime);
+                const dtEndUtc = formatLocalToUtc(year, month, day, isAllDay ? null : plan.oneendTime);
 
                 lines.push('BEGIN:VEVENT');
-                const uid = `${uidCounter++}-${pIdx}-${dIdx}@calendarapp`;
+                const uid = `${uidBase}-${pIdx}-${dIdx}@calendarapp`;
                 lines.push(`UID:${uid}`);
+                // DTSTAMP: now in UTC
+                lines.push(`DTSTAMP:${toUtcStamp(new Date())}`);
                 if (isAllDay) {
-                    lines.push(`DTSTART;VALUE=DATE:${dtStart}`);
-                    lines.push(`DTEND;VALUE=DATE:${dtStart}`);
+                    const dateStr = `${year}${pad(month)}${pad(day)}`;
+                    lines.push(`DTSTART;VALUE=DATE:${dateStr}`);
+                    // set DTEND as the next day for all-day events per RFC (exclusive)
+                    const next = new Date(year, month - 1, day + 1);
+                    lines.push(`DTEND;VALUE=DATE:${next.getFullYear()}${pad(next.getMonth()+1)}${pad(next.getDate())}`);
                 } else {
-                    lines.push(`DTSTART:${dtStart}`);
-                    if (dtEnd) lines.push(`DTEND:${dtEnd}`);
+                    if (dtStartUtc) lines.push(`DTSTART:${dtStartUtc}`);
+                    if (dtEndUtc) lines.push(`DTEND:${dtEndUtc}`);
                 }
                 const summary = (plan.place || '予定').toString().replace(/\r?\n/g, ' ');
                 lines.push(`SUMMARY:${summary}`);
